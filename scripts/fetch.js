@@ -272,7 +272,8 @@ async function main() {
         } catch (err) {
             const cause = err.cause && err.cause.message ? err.cause.message : '';
             log(`[${stage.name}] 失败: ${err.message}${cause ? ` (${cause})` : ''}`);
-            lastErr = err;
+            // 最终失败行需能定位失败级（与文档声明一致）；verbose 日志已含 stage，此处包装后 --verbose 行为不变
+            lastErr = new Error(`[stage:${stage.name}] ${err.message}`);
         }
     }
     process.stderr.write(`fetch failed: ${lastErr ? lastErr.message : 'unknown'} (all stages exhausted)\n`);
