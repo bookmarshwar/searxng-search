@@ -2,6 +2,7 @@
   "name": "searxng-search-skill",
   "private": true,
   "version": "0.1.0",
+  "license": "MIT",
   "description": "Local SearXNG dual-instance search + URL fetch (HTML->Markdown via turndown). Zero-external-runtime deps beyond bundled node_modules.",
   "dependencies": {
     "turndown": "^7.2.0"
