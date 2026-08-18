@@ -149,6 +149,10 @@ Each stage runs a content-quality check: 403 / block pages, JS-challenge walls, 
 base64-image spam are treated as failure — no false "success" from a block page.
 每一级都做内容质量门控：403 拦截页、验证墙、空页面、base64 图片噪声一律判为失败并继续降级——绝不让拦截页冒充成功。
 
+> **Note / 注意:** Jina 级只返回 Markdown 文本。`-f html` 时若由 Jina 级服务，会输出 Markdown 并在 stderr 提示。
+> 使用 `--verbose` 可查看每个站点实际由哪一级服务；`--no-fallback` 只走 stage 1（单级抓取）。
+> Jina 级仅返回 Markdown；`-f html` 由 Jina 服务时降级为 Markdown 并提示 stderr；`--verbose` 显示服务级；`--no-fallback` 走单级。
+
 ---
 
 ## Dependencies / 依赖

@@ -4,13 +4,17 @@ description: >-
   Search the web via local SearXNG dual instances: google cse on :8888 (via Clash proxy
   127.0.0.1:7897) and cn.bing.com on :8889 (direct, no proxy). Node-based, call directly:
   node scripts/search.js --query <q> --count <n> --page <p>; also fetch a URL as markdown:
-  node scripts/fetch.js --url <u> [-f markdown|text|html] (turndown-based, honors proxies).
-  Returns structured JSON; exit code 0 = results, 1 = none. PowerShell wrappers
-  (run.ps1/fetch.ps1) are Windows-only equivalents.
+  node scripts/fetch.js --url <u> [-f markdown|text|html] [-t sec] [--no-fallback] [--verbose].
+  fetch.js auto-falls back through native fetch -> curl-via-proxy -> Jina Reader, so hard
+  sites (HN/GitHub/zhihu/Cloudflare-challenge) still work; content-quality gate rejects
+  block pages. Returns structured JSON; exit code 0 = results, 1 = none. PowerShell
+  wrappers (run.ps1/fetch.ps1) are Windows-only equivalents.
   通过本地 SearXNG 双实例搜索（8888 google cse 走 Clash 代理 / 8889 cn.bing 直连）。直接调用：
   node scripts/search.js --query <查询词> -n 条数(默认8) -p 页码(默认1)，抓网页
-  node scripts/fetch.js --url <网址> [-f markdown|text|html]。输出结构化 JSON，
-  退出码 0=有结果，1=无结果。适用于需要联网检索、查资料、验证信息、中英文搜索的场景。
+  node scripts/fetch.js --url <网址> [-f markdown|text|html] [-t 秒] [--no-fallback] [--verbose]。
+  抓取自动三级降级：原生 fetch → curl 走代理 → Jina Reader，可攻克知乎/HN/Cloudflare
+  挑战站等硬站点；内容质量门控拒绝拦截页。输出结构化 JSON，退出码 0=有结果，1=无结果。
+  适用于需要联网检索、查资料、验证信息、中英文搜索的场景。
 ---
 
 # SearXNG Search Skill
@@ -45,6 +49,7 @@ as Markdown (HTML->Markdown via the same turndown library opencode's webfetch us
 >
 > - `search.js` 参数：`--query/-q` 查询词(必填)，`--count/-n` 条数(默认8)，`--page/-p` 页码(默认1)
 > - `fetch.js` 参数：`--url/-u` 网址(必填)，`-f markdown|text|html`(默认 markdown)，`-t` 超时秒(默认30)
+> - `fetch.js` 可选：`--no-fallback` 禁用降级链(等同单级抓取)，`--verbose` 打印每级降级路径
 > - 若技能目录不在 `~/.agents/skills/searxng-search`，先 `find` 定位含 `scripts/search.js` 的目录再 `cd`。
 
 **Windows / 有 PowerShell 时，才用等价的 ps1 包装脚本：**
@@ -63,9 +68,26 @@ as Markdown (HTML->Markdown via the same turndown library opencode's webfetch us
 & "$env:USERPROFILE\.agents\skills\searxng-search\scripts\fetch.ps1" -u "https://example.com" -f text
 ```
 
-## Fetch details
+## Enhanced fetch (3-stage fallback)
+
+fetch.js 自动三级降级，硬站点也能抓：原生 node fetch → curl 走环境代理 → Jina Reader 云端渲染。
+
+```
+stage 1  native node fetch   Chrome headers + Accept 协商 + Cloudflare-challenge 换 UA 重试
+         ↓ 失败 / 被拦截 / 空页
+stage 2  curl via env proxy  修复 node fetch 在 socks/混合代理、TLS 指纹环境失效的问题
+         ↓ 失败 / 被拦截 / 空页
+stage 3  Jina Reader          r.jina.ai 云端渲染 — 唯一能破知乎/强反爬站的本地方案
+```
+
+- 每级之间做**内容质量检查**：403 拦截页、JS 验证墙、空响应、base64 图片噪声 → 判为该级无效并继续降级，绝不让拦截页冒充成功
+- 若全部降级失败：stderr 输出最后失败原因（含 `[stage:xxx]` 标注），退出码 1
+- `--no-fallback` 只走 stage 1（等同单级抓取）；`--verbose` 打印每级路径到 stderr（排查用）
+
+### Fetch details
 
 - Output: the page converted to Markdown (default), plain text (`-f text`), or raw HTML (`-f html`).
+  Jina 级只返回 Markdown，`-f html` 时输出 Markdown 并在 stderr 提示。
 - `http://` URLs are auto-upgraded to `https://`.
 - Honors `http_proxy`/`https_proxy` env vars (e.g. `http://127.0.0.1:7897` for Clash);
   restricted/blocked sites need the proxy, domestic sites work direct.
@@ -126,5 +148,5 @@ Single JSON document on stdout:
 - `scripts/run.ps1` — search entry point (`-q` required, `-n` default 8, `-p` default 1)
 - `scripts/search.js` — node query logic: concurrent dual-port fetch, weighted merge (google 13 : bing 7), URL dedup, 10-min cache
 - `scripts/fetch.ps1` — URL fetch entry point (`-u` required, `-f` markdown|text|html, `-t` timeout)
-- `scripts/fetch.js` — node fetch: turndown HTML->Markdown, env proxy, 5MB cap, Cloudflare-challenge retry
+- `scripts/fetch.js` — node fetch: 3-stage fallback (fetch → curl → Jina), content-quality gate, 5MB cap, proxy-aware
 - `node_modules/` — bundled `turndown` + `domino` (used by fetch.js)

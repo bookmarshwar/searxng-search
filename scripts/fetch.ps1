@@ -1,7 +1,9 @@
 param(
     [Parameter(Mandatory = $true)][string]$u,
     [ValidateSet('markdown', 'text', 'html')][string]$f = 'markdown',
-    [int]$t = 30
+    [int]$t = 30,
+    [switch]$NoFallback,
+    [switch]$Verbose
 )
 
 $ErrorActionPreference = 'Stop'
@@ -24,8 +26,12 @@ if (-not $node) {
     exit 1
 }
 
+$args = @('--url', $u, '--format', $f, '--timeout', $t)
+if ($NoFallback) { $args += '--no-fallback' }
+if ($Verbose) { $args += '--verbose' }
+
 try {
-    & $node.Source $jsPath --url $u --format $f --timeout $t
+    & $node.Source $jsPath @args
 } catch {
     Write-Error "searxng-fetch failed: $_"
     exit 1
